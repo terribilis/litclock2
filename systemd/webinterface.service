@@ -1,0 +1,17 @@
+[Unit]
+Description=Literary Clock Web Interface
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/litclock
+ExecStart=/usr/bin/python3 /home/pi/litclock/web_interface.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=litclock-web
+
+[Install]
+WantedBy=multi-user.target 
