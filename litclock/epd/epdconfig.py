@@ -1,13 +1,13 @@
-# *****************************************************************************
+# /*****************************************************************************
 # * | File        :	  epdconfig.py
 # * | Author      :   Waveshare team
 # * | Function    :   Hardware underlying interface
 # * | Info        :
 # *----------------
-# * | This version:   V1.0
-# * | Date        :   2024-04-08
-# # | Info        :   python demo
-# *****************************************************************************
+# * | This version:   V1.2
+# * | Date        :   2022-10-29
+# * | Info        :   
+# ******************************************************************************
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documnetation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
@@ -31,29 +31,62 @@ import os
 import logging
 import sys
 import time
+import subprocess
+
+from ctypes import *
 
 logger = logging.getLogger(__name__)
 
+
 class RaspberryPi:
     # Pin definition
-    RST_PIN         = 17
-    DC_PIN          = 25
-    CS_PIN          = 8
-    BUSY_PIN        = 24
+    RST_PIN  = 17
+    DC_PIN   = 25
+    CS_PIN   = 8
+    BUSY_PIN = 24
+    PWR_PIN  = 18
+    MOSI_PIN = 10
+    SCLK_PIN = 11
 
     def __init__(self):
         import spidev
-        import RPi.GPIO
-
-        self.GPIO = RPi.GPIO
+        import gpiozero
+        
         self.SPI = spidev.SpiDev()
+        self.GPIO_RST_PIN    = gpiozero.LED(self.RST_PIN)
+        self.GPIO_DC_PIN     = gpiozero.LED(self.DC_PIN)
+        # self.GPIO_CS_PIN     = gpiozero.LED(self.CS_PIN)
+        self.GPIO_PWR_PIN    = gpiozero.LED(self.PWR_PIN)
+        self.GPIO_BUSY_PIN   = gpiozero.Button(self.BUSY_PIN, pull_up = False)
+
+        
 
     def digital_write(self, pin, value):
-        self.GPIO.output(pin, value)
+        if pin == self.RST_PIN:
+            if value:
+                self.GPIO_RST_PIN.on()
+            else:
+                self.GPIO_RST_PIN.off()
+        elif pin == self.DC_PIN:
+            if value:
+                self.GPIO_DC_PIN.on()
+            else:
+                self.GPIO_DC_PIN.off()
+        # elif pin == self.CS_PIN:
+        #     if value:
+        #         self.GPIO_CS_PIN.on()
+        #     else:
+        #         self.GPIO_CS_PIN.off()
+        elif pin == self.PWR_PIN:
+            if value:
+                self.GPIO_PWR_PIN.on()
+            else:
+                self.GPIO_PWR_PIN.off()
 
     def digital_read(self, pin):
-        return self.GPIO.input(pin)
-
+        if pin == self.BUSY_PIN:
+            return self.GPIO_BUSY_PIN.is_pressed
+            
     def delay_ms(self, delaytime):
         time.sleep(delaytime / 1000.0)
 
@@ -63,102 +96,75 @@ class RaspberryPi:
     def spi_writebyte2(self, data):
         self.SPI.writebytes2(data)
 
-    def module_init(self):
-        self.GPIO.setmode(self.GPIO.BCM)
-        self.GPIO.setwarnings(False)
-        self.GPIO.setup(self.RST_PIN, self.GPIO.OUT)
-        self.GPIO.setup(self.DC_PIN, self.GPIO.OUT)
-        self.GPIO.setup(self.CS_PIN, self.GPIO.OUT)
-        self.GPIO.setup(self.BUSY_PIN, self.GPIO.IN)
+    def DEV_SPI_write(self, data):
+        self.DEV_SPI.DEV_SPI_SendData(data)
 
+    def DEV_SPI_nwrite(self, data):
+        self.DEV_SPI.DEV_SPI_SendnData(data)
+
+    def DEV_SPI_read(self):
+        return self.DEV_SPI.DEV_SPI_ReadData()
+
+    def module_init(self, cleanup=False):
+        self.GPIO_PWR_PIN.on()
+        
+        if cleanup:
+            find_dirs = [
+                os.path.dirname(os.path.realpath(__file__)),
+                '/usr/local/lib',
+                '/usr/lib',
+            ]
+            self.DEV_SPI = None
+            for find_dir in find_dirs:
+                val = int(os.popen('getconf LONG_BIT').read())
+                logging.debug("System is %d bit"%val)
+                if val == 64:
+                    so_filename = os.path.join(find_dir, 'DEV_Config_64.so')
+                else:
+                    so_filename = os.path.join(find_dir, 'DEV_Config_32.so')
+                if os.path.exists(so_filename):
+                    self.DEV_SPI = CDLL(so_filename)
+                    break
+            if self.DEV_SPI is None:
+                RuntimeError('Cannot find DEV_Config.so')
+
+            self.DEV_SPI.DEV_Module_Init()
+        
+        # self.GPIO_CS_PIN.on()
+        self.GPIO_DC_PIN.off()
+        self.GPIO_RST_PIN.off()
+        
         # SPI device, bus = 0, device = 0
         self.SPI.open(0, 0)
-        self.SPI.max_speed_hz = 4000000
+        self.SPI.max_speed_hz = 10000000
         self.SPI.mode = 0b00
         return 0
 
     def module_exit(self, cleanup=False):
         logger.debug("spi end")
+        self.GPIO_PWR_PIN.off()
         self.SPI.close()
-
-        logger.debug("close 5V, Module enters 0 power consumption ...")
+        
         if cleanup:
-            self.GPIO.cleanup([self.RST_PIN, self.DC_PIN, self.CS_PIN, self.BUSY_PIN])
+            pass # add any necessary cleanup code here
+            
+        logger.debug("close 5V, Module enters 0 power consumption ...")
         return 0
+
 
 # For Jetson Nano
 class JetsonNano:
     # Pin definition
-    RST_PIN         = 17
-    DC_PIN          = 25
-    CS_PIN          = 8
-    BUSY_PIN        = 24
+    RST_PIN    = 17
+    DC_PIN     = 25
+    CS_PIN     = 8
+    BUSY_PIN   = 24
+    PWR_PIN    = 18
 
     def __init__(self):
-        import ctypes
-        find_dirs = [
-            os.path.dirname(os.path.realpath(__file__)),
-            '/usr/local/lib',
-            '/usr/lib',
-        ]
-        self.SPI = None
-        for find_dir in find_dirs:
-            so_filename = os.path.join(find_dir, 'sysfs_software_spi.so')
-            if os.path.exists(so_filename):
-                self.SPI = ctypes.cdll.LoadLibrary(so_filename)
-                break
-        if self.SPI is None:
-            raise RuntimeError('Cannot find sysfs_software_spi.so')
-
         import Jetson.GPIO
-        self.GPIO = Jetson.GPIO
-
-    def digital_write(self, pin, value):
-        self.GPIO.output(pin, value)
-
-    def digital_read(self, pin):
-        return self.GPIO.input(self.BUSY_PIN)
-
-    def delay_ms(self, delaytime):
-        time.sleep(delaytime / 1000.0)
-
-    def spi_writebyte(self, data):
-        self.SPI.SYSFS_software_spi_transfer(data[0])
-
-    def spi_writebyte2(self, data):
-        for i in range(len(data)):
-            self.SPI.SYSFS_software_spi_transfer(data[i])
-
-    def module_init(self):
-        self.GPIO.setmode(self.GPIO.BCM)
-        self.GPIO.setwarnings(False)
-        self.GPIO.setup(self.RST_PIN, self.GPIO.OUT)
-        self.GPIO.setup(self.DC_PIN, self.GPIO.OUT)
-        self.GPIO.setup(self.CS_PIN, self.GPIO.OUT)
-        self.GPIO.setup(self.BUSY_PIN, self.GPIO.IN)
-        self.SPI.SYSFS_software_spi_begin()
-        return 0
-
-    def module_exit(self, cleanup=False):
-        logger.debug("spi end")
-        self.SPI.SYSFS_software_spi_end()
-
-        logger.debug("close 5V, Module enters 0 power consumption ...")
-        if cleanup:
-            self.GPIO.cleanup([self.RST_PIN, self.DC_PIN, self.CS_PIN, self.BUSY_PIN])
-        return 0
-
-class SunriseX3:
-    # Pin definition
-    RST_PIN         = 17
-    DC_PIN          = 25
-    CS_PIN          = 8
-    BUSY_PIN        = 24
-
-    def __init__(self):
-        import hobot.gpio as gpio
         import spidev
-        self.GPIO = gpio
+        self.GPIO = Jetson.GPIO
         self.SPI = spidev.SpiDev()
 
     def digital_write(self, pin, value):
@@ -174,106 +180,123 @@ class SunriseX3:
         self.SPI.writebytes(data)
 
     def spi_writebyte2(self, data):
-        self.SPI.writebytes2(data)
+        self.SPI.xfer2(data)
 
-    def module_init(self):
+    def module_init(self, cleanup=False):
         self.GPIO.setmode(self.GPIO.BCM)
         self.GPIO.setwarnings(False)
         self.GPIO.setup(self.RST_PIN, self.GPIO.OUT)
         self.GPIO.setup(self.DC_PIN, self.GPIO.OUT)
         self.GPIO.setup(self.CS_PIN, self.GPIO.OUT)
+        self.GPIO.setup(self.PWR_PIN, self.GPIO.OUT)
         self.GPIO.setup(self.BUSY_PIN, self.GPIO.IN)
-
+        
+        self.GPIO.output(self.PWR_PIN, 1)
+        
         # SPI device, bus = 0, device = 0
-        self.SPI.open(1, 0)
-        self.SPI.max_speed_hz = 4000000
+        self.SPI.open(0, 0)
+        self.SPI.max_speed_hz = 10000000
         self.SPI.mode = 0b00
         return 0
 
     def module_exit(self, cleanup=False):
         logger.debug("spi end")
+        self.GPIO.output(self.PWR_PIN, 0)
         self.SPI.close()
 
-        logger.debug("close 5V, Module enters 0 power consumption ...")
         if cleanup:
-            self.GPIO.cleanup([self.RST_PIN, self.DC_PIN, self.CS_PIN, self.BUSY_PIN])
+            self.GPIO.cleanup([self.RST_PIN, self.DC_PIN, self.CS_PIN, self.BUSY_PIN, self.PWR_PIN])
+            
+        logger.debug("close 5V, Module enters 0 power consumption ...")
         return 0
 
-class ESP32:
-    # Pin definition
-    RST_PIN         = 16
-    DC_PIN          = 17
-    CS_PIN          = 5
-    BUSY_PIN        = 4
 
+# For Mac
+class Mac:
+    RST_PIN = 17
+    DC_PIN = 25
+    CS_PIN = 8
+    BUSY_PIN = 24
+    PWR_PIN = 18
+        
     def __init__(self):
-        import machine
-        import spidev
-        self.GPIO = machine
-        self.SPI = machine.SPI(1, 10000000, sck=machine.Pin(18), mosi=machine.Pin(23))
+        # Use a mock implementation for testing on Mac
+        pass
 
     def digital_write(self, pin, value):
-        if pin == self.RST_PIN:
-            self.rst.value(value)
-        elif pin == self.DC_PIN:
-            self.dc.value(value)
-        elif pin == self.CS_PIN:
-            self.cs.value(value)
-            
+        return 0
+
     def digital_read(self, pin):
-        if pin == self.BUSY_PIN:
-            return self.busy.value()
-            
+        return 0
+
     def delay_ms(self, delaytime):
         time.sleep(delaytime / 1000.0)
-        
-    def spi_writebyte(self, data):
-        self.SPI.write(bytearray(data))
-        
-    def spi_writebyte2(self, data):
-        self.SPI.write(bytearray(data))
-        
-    def module_init(self):
-        self.rst = self.GPIO.Pin(self.RST_PIN, self.GPIO.OUT, value=1)
-        self.dc = self.GPIO.Pin(self.DC_PIN, self.GPIO.OUT, value=0)
-        self.busy = self.GPIO.Pin(self.BUSY_PIN, self.GPIO.IN)
-        self.cs = self.GPIO.Pin(self.CS_PIN, self.GPIO.OUT, value=1)
-        
-        return 0
-        
-    def module_exit(self, cleanup=False):
-        logger.debug("spi end")
-        if cleanup:
-            self.GPIO.Pin(self.RST_PIN, self.GPIO.IN)
-            self.GPIO.Pin(self.DC_PIN, self.GPIO.IN)
-            self.GPIO.Pin(self.CS_PIN, self.GPIO.IN)
-            self.GPIO.Pin(self.BUSY_PIN, self.GPIO.IN)
 
-# Select the hardware platform
+    def spi_writebyte(self, data):
+        return 0
+
+    def spi_writebyte2(self, data):
+        return 0
+
+    def module_init(self, cleanup=False):
+        return 0
+
+    def module_exit(self, cleanup=False):
+        return 0
+
+
+# For Windows
+class Windows:
+    RST_PIN = 17
+    DC_PIN = 25
+    CS_PIN = 8
+    BUSY_PIN = 24
+    PWR_PIN = 18
+        
+    def __init__(self):
+        # Use a mock implementation for testing on Windows
+        pass
+
+    def digital_write(self, pin, value):
+        return 0
+
+    def digital_read(self, pin):
+        return 0
+
+    def delay_ms(self, delaytime):
+        time.sleep(delaytime / 1000.0)
+
+    def spi_writebyte(self, data):
+        return 0
+
+    def spi_writebyte2(self, data):
+        return 0
+
+    def module_init(self, cleanup=False):
+        return 0
+
+    def module_exit(self, cleanup=False):
+        return 0
+
+
+# Select the appropriate implementation based on platform
 if os.path.exists('/sys/bus/platform/drivers/gpiomem-bcm2835'):
     implementation = RaspberryPi()
-elif os.path.exists('/sys/bus/platform/drivers/gpio-x3'):
-    implementation = SunriseX3()
-elif os.path.exists('/sys/firmware/devicetree/base/model'):
-    with open('/sys/firmware/devicetree/base/model', 'r') as file:
-        model = file.read()
-        if 'Jetson' in model:
-            implementation = JetsonNano()
-        elif 'Raspberry' in model:
-            implementation = RaspberryPi()
-        else:
-            implementation = RaspberryPi()
+    logger.debug("Using Raspberry Pi implementation")
+elif os.path.exists('/sys/bus/platform/drivers/gpio-tegra'):
+    implementation = JetsonNano()
+    logger.debug("Using Jetson Nano implementation")
+elif sys.platform == 'darwin':
+    implementation = Mac()
+    logger.debug("Using Mac implementation (mock)")
+elif sys.platform == 'win32':
+    implementation = Windows()
+    logger.debug("Using Windows implementation (mock)")
 else:
-    try:
-        import platform
-        if platform.node() == 'esp32':
-            implementation = ESP32()
-        else:
-            implementation = RaspberryPi()
-    except:
-        implementation = RaspberryPi()
+    logger.error("Could not detect platform, defaulting to Raspberry Pi")
+    implementation = RaspberryPi()
 
-# Expose the implementation to users
+# Expose the implementation's methods
 digital_write = implementation.digital_write
 digital_read = implementation.digital_read
 delay_ms = implementation.delay_ms
@@ -286,5 +309,6 @@ RST_PIN = implementation.RST_PIN
 DC_PIN = implementation.DC_PIN
 CS_PIN = implementation.CS_PIN
 BUSY_PIN = implementation.BUSY_PIN
+PWR_PIN = implementation.PWR_PIN
 
 ### END OF FILE ### 
