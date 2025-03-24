@@ -154,7 +154,8 @@ The `data/config.json` file contains the following settings:
     "show_book_info": true,
     "show_author": true,
     "content_filter": "all",
-    "display_brightness": 100
+    "display_brightness": 100,
+    "partial_refresh_count": 10
 }
 ```
 
@@ -164,6 +165,7 @@ The `data/config.json` file contains the following settings:
 - `show_author`: Whether to display the author name (default: true)
 - `content_filter`: Content filter setting ("all", "sfw", or "nsfw")
 - `display_brightness`: Display brightness percentage (0-100)
+- `partial_refresh_count`: Number of partial refreshes before a full refresh (default: 10)
 
 ## Package Structure
 

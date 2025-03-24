@@ -38,7 +38,8 @@ class WebInterface:
                 "show_book_info": True,
                 "show_author": True,
                 "content_filter": "all",
-                "display_brightness": 100
+                "display_brightness": 100,
+                "partial_refresh_count": 10
             }
             with open(self.config_path, 'w') as f:
                 json.dump(default_config, f, indent=4)
@@ -70,6 +71,7 @@ class WebInterface:
                 config['show_author'] = 'show_author' in request.form
                 config['content_filter'] = request.form.get('content_filter', 'all')
                 config['display_brightness'] = int(request.form.get('display_brightness', 100))
+                config['partial_refresh_count'] = int(request.form.get('partial_refresh_count', 10))
                 
                 # Save the updated config
                 if self.save_config(config):
@@ -175,7 +177,8 @@ class WebInterface:
                 "show_book_info": True,
                 "show_author": True,
                 "content_filter": "all",
-                "display_brightness": 100
+                "display_brightness": 100,
+                "partial_refresh_count": 10
             }
     
     def save_config(self, config):
@@ -251,6 +254,12 @@ class WebInterface:
             <div class="form-group">
                 <label for="font_size">Font Size:</label>
                 <input type="number" id="font_size" name="font_size" min="10" max="80" value="{{ config.font_size }}">
+            </div>
+            
+            <div class="form-group">
+                <label for="partial_refresh_count">Partial Refresh Count:</label>
+                <input type="number" id="partial_refresh_count" name="partial_refresh_count" min="1" max="20" value="{{ config.partial_refresh_count }}">
+                <small>Number of partial refreshes before a full refresh (1-20)</small>
             </div>
             
             <div class="form-group checkbox">

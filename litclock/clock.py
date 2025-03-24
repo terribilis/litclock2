@@ -42,6 +42,9 @@ class LiteraryClock:
         # Flag to track if we need to regenerate JSON from CSV
         self.should_regenerate_json = False
         
+        # Track partial refresh count
+        self.partial_refresh_count = 0
+        
         # Check if JSON needs to be generated
         json_path = os.path.join(self.base_dir, 'data', 'quotes.json')
         if not os.path.exists(json_path):
@@ -63,7 +66,8 @@ class LiteraryClock:
                 "show_book_info": True,
                 "show_author": True,
                 "content_filter": "all",
-                "display_brightness": 100
+                "display_brightness": 100,
+                "partial_refresh_count": 10  # Number of partial refreshes before a full refresh
             }
             logger.info(f"Using default configuration: {default_config}")
             return default_config
@@ -120,10 +124,20 @@ class LiteraryClock:
             black_buffer = self.epd.getbuffer(black_image)
             red_buffer = self.epd.getbuffer(red_image)
             
-            # Display the images
-            self.epd.display(black_buffer, red_buffer)
-            logger.info("Display updated successfully")
+            # Check if we need a full refresh
+            partial_refresh_count = self.config.get('partial_refresh_count', 10)
+            if self.partial_refresh_count >= partial_refresh_count:
+                logger.info("Performing full refresh after partial refresh count reached")
+                self.epd.display(black_buffer, red_buffer)
+                self.partial_refresh_count = 0
+            else:
+                # Use partial refresh
+                logger.info(f"Performing partial refresh ({self.partial_refresh_count + 1}/{partial_refresh_count})")
+                # For partial refresh, we only update the black channel
+                self.epd.display_Partial(black_buffer, 0, 0, self.epd.width, self.epd.height)
+                self.partial_refresh_count += 1
             
+            logger.info("Display updated successfully")
             return True
             
         except Exception as e:
