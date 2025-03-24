@@ -32,9 +32,33 @@ def start_web_server_thread(host='0.0.0.0', port=8080):
     
     return start_web_server_thread(host, port)
 
+def cleanup_gpio():
+    """Clean up any in-use GPIO pins to avoid resource conflicts"""
+    try:
+        # Try to import and use gpiozero's cleanup function
+        import gpiozero
+        gpiozero.Device.close_all()
+        logger.info("Successfully cleaned up GPIO resources")
+        import time
+        time.sleep(0.5)  # Give a little time for cleanup
+        return True
+    except ImportError:
+        # On systems without GPIO hardware (like Mac/Windows), we just pretend it worked
+        if sys.platform in ('darwin', 'win32'):
+            logger.info("Running on non-Raspberry Pi system, GPIO cleanup not needed")
+            return True
+        logger.warning("gpiozero module not available for GPIO cleanup")
+        return False
+    except Exception as e:
+        logger.error(f"Error during GPIO cleanup: {e}")
+        return False
+
 def test_display():
     """Run a test on the e-paper display"""
-    # First ensure compatibility setup is done
+    # First clean up any GPIO resources to avoid conflicts
+    cleanup_gpio()
+    
+    # Ensure compatibility setup is done
     try:
         from litclock.epd.compatibility import ensure_compatibility
         ensure_compatibility()
@@ -45,12 +69,16 @@ def test_display():
     from litclock.epd.test_display import test_display as run_test
     
     logger.info("Running e-paper display test...")
-    success = run_test()
-    if success:
-        logger.info("Display test completed successfully")
-    else:
-        logger.error("Display test failed or was interrupted")
-        sys.exit(1)
+    try:
+        success = run_test()
+        if success:
+            logger.info("Display test completed successfully")
+        else:
+            logger.error("Display test failed or was interrupted")
+            sys.exit(1)
+    finally:
+        # Always clean up GPIO at the end
+        cleanup_gpio()
 
 def run_all(config_path='data/config.json', regenerate=False, host='0.0.0.0', port=8080):
     """Run both the clock and web interface"""
@@ -90,6 +118,7 @@ def main():
     parser.add_argument('--web-only', action='store_true', help='Run only the web interface')
     parser.add_argument('--clock-only', action='store_true', help='Run only the clock')
     parser.add_argument('--test', action='store_true', help='Run a test on the e-paper display')
+    parser.add_argument('--cleanup-gpio', action='store_true', help='Clean up GPIO resources and exit')
     parser.add_argument('--config', default='data/config.json', help='Path to config file')
     parser.add_argument('--regenerate', action='store_true', help='Regenerate quotes JSON database')
     parser.add_argument('--web-port', type=int, default=8080, help='Web interface port')
@@ -115,7 +144,15 @@ def main():
     
     # Run the appropriate command
     try:
-        if args.test:
+        if args.cleanup_gpio:
+            # Just clean up GPIO and exit
+            if cleanup_gpio():
+                logger.info("GPIO cleanup completed successfully")
+            else:
+                logger.error("GPIO cleanup failed")
+                return 1
+            return 0
+        elif args.test:
             # Run display test
             test_display()
         elif args.web_only:

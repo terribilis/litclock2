@@ -24,62 +24,68 @@ if utils_path not in sys.path:
     sys.path.insert(0, utils_path)
     logger.debug(f"Added utils path to sys.path: {utils_path}")
 
-# Import and run the compatibility module to ensure paths are set up
-try:
-    logger.debug("Attempting to import and run compatibility module...")
-    from litclock.epd.compatibility import ensure_compatibility
-    ensure_compatibility()
-    logger.debug("Compatibility setup complete")
-except Exception as e:
-    logger.warning(f"Compatibility setup failed: {e}, will try direct import")
+_epd_module = None  # Cache the module to prevent multiple imports
 
 def get_epd_module():
-    """Try multiple ways to import the EPD module"""
+    """Get the EPD module, with caching to prevent multiple imports"""
+    global _epd_module
+    if _epd_module is not None:
+        return _epd_module
     
-    # Method 1: Try direct import like the original working script
-    try:
-        logger.debug("Trying direct import from utils...")
-        import epd13in3b
-        logger.info("SUCCESS: Imported epd13in3b directly")
-        return epd13in3b
-    except ImportError as e:
-        logger.debug(f"Direct import failed: {e}")
-    
-    # Method 2: Try package import
+    # First, try the package import which is preferred
     try:
         logger.debug("Trying package import...")
         from litclock.epd import epd13in3b
         logger.info("SUCCESS: Imported epd13in3b from package")
-        return epd13in3b
+        _epd_module = epd13in3b
+        return _epd_module
     except ImportError as e:
         logger.debug(f"Package import failed: {e}")
     
-    # Method 3: Try sys.path manipulation
+    # If package import fails, try direct import
     try:
-        logger.debug("Trying import after path manipulation...")
+        logger.debug("Trying direct import from utils...")
+        # Try a dynamic import to avoid conflicts
+        import importlib.util
         module_path = os.path.join(utils_path, 'epd13in3b.py')
         if os.path.exists(module_path):
             logger.debug(f"Found module at {module_path}")
             
-            # If we're on Python 3.5+, use importlib.util
-            if sys.version_info >= (3, 5):
-                import importlib.util
-                spec = importlib.util.spec_from_file_location("epd13in3b", module_path)
-                epd13in3b = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(epd13in3b)
-                logger.info("SUCCESS: Imported epd13in3b using importlib")
-                return epd13in3b
-        else:
-            logger.error(f"Module file not found at {module_path}")
+            # Use importlib to load the module
+            spec = importlib.util.spec_from_file_location("epd13in3b_direct", module_path)
+            epd13in3b = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(epd13in3b)
+            logger.info("SUCCESS: Imported epd13in3b using importlib")
+            _epd_module = epd13in3b
+            return _epd_module
     except Exception as e:
-        logger.debug(f"Import after path manipulation failed: {e}")
+        logger.debug(f"Direct import failed: {e}")
     
     # If all methods fail, raise an error
     raise ImportError("Could not import epd13in3b module using any method")
 
+# Function to clean up GPIO pins before initializing
+def cleanup_gpio():
+    """Try to clean up GPIO pins before initializing"""
+    try:
+        import gpiozero
+        # Close any existing connections to pins
+        gpiozero.Device.close_all()
+        logger.info("Successfully cleaned up GPIO pins")
+        
+        # Give a little time for cleanup
+        time.sleep(0.5)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to clean up GPIO pins: {e}")
+        return False
+
 def test_display():
     """Run a comprehensive test of the e-paper display"""
     try:
+        # Clean up GPIO pins first
+        cleanup_gpio()
+        
         # Try to get the EPD module
         try:
             epd13in3b = get_epd_module()
@@ -180,15 +186,26 @@ def test_display():
         logger.error(f"Error during test: {e}")
         traceback.print_exc()
         return False
+    finally:
+        # Always clean up GPIO pins at the end
+        cleanup_gpio()
 
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(description='Test the e-paper display')
     parser.add_argument('--debug', action='store_true', help='Enable verbose debug output')
+    parser.add_argument('--cleanup-only', action='store_true', help='Just clean up GPIO pins and exit')
     args = parser.parse_args()
     
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
+    
+    if args.cleanup_only:
+        if cleanup_gpio():
+            print("GPIO cleanup completed successfully!")
+        else:
+            print("GPIO cleanup failed.")
+        return
     
     if test_display():
         print("Display test completed successfully!")

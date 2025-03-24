@@ -8,6 +8,7 @@ import os
 import sys
 import logging
 import importlib.util
+import time
 
 # Add the current directory to sys.path to enable direct imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -17,6 +18,22 @@ sys.path.insert(0, os.path.join(parent_dir, 'utils'))  # Add utils directory to 
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+def cleanup_gpio():
+    """Clean up any used GPIO pins"""
+    try:
+        import gpiozero
+        # Close all GPIO devices
+        gpiozero.Device.close_all()
+        logger.info("Successfully cleaned up GPIO resources")
+        time.sleep(0.5)  # Give a little time for cleanup
+        return True
+    except ImportError:
+        logger.warning("gpiozero module not available, skipping cleanup")
+        return False
+    except Exception as e:
+        logger.error(f"Error during GPIO cleanup: {e}")
+        return False
 
 def check_gpio_libraries():
     """Check which GPIO libraries are available"""
@@ -40,6 +57,9 @@ def ensure_compatibility():
     Ensure that both import methods work by setting up the proper paths
     and creating any necessary symbolic links.
     """
+    # First clean up any GPIO resources
+    cleanup_gpio()
+    
     # Check which GPIO libraries are available
     libraries = check_gpio_libraries()
     
@@ -98,6 +118,9 @@ if __name__ == "__main__":
     # Set up logging
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    
+    # Clean up GPIO resources first
+    cleanup_gpio()
     
     if ensure_compatibility():
         print("Compatibility check complete - all modules available")

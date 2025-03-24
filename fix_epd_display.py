@@ -10,6 +10,7 @@ import shutil
 import logging
 import importlib
 import argparse
+import time
 
 # Configure logging
 logging.basicConfig(
@@ -17,6 +18,21 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger('epd_fix')
+
+def cleanup_gpio():
+    """Clean up any in-use GPIO pins"""
+    try:
+        import gpiozero
+        gpiozero.Device.close_all()
+        logger.info("✓ Successfully cleaned up GPIO resources")
+        time.sleep(0.5)  # Give a little time for cleanup
+        return True
+    except ImportError:
+        logger.warning("✗ gpiozero module not available for GPIO cleanup")
+        return False
+    except Exception as e:
+        logger.error(f"✗ Error during GPIO cleanup: {e}")
+        return False
 
 def check_dependencies():
     """Check if required dependencies are installed"""
@@ -37,6 +53,9 @@ def fix_imports():
     """
     Fix the imports by copying files from utils to the package directory
     """
+    # Clean up GPIO first to avoid resource conflicts
+    cleanup_gpio()
+    
     # Get the script directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
@@ -100,10 +119,18 @@ def main():
     parser = argparse.ArgumentParser(description='Fix e-paper display issues')
     parser.add_argument('--check', action='store_true', help='Check dependencies only')
     parser.add_argument('--fix', action='store_true', help='Fix imports by copying files')
+    parser.add_argument('--cleanup', action='store_true', help='Clean up GPIO resources only')
     args = parser.parse_args()
     
-    if not (args.check or args.fix):
+    if not (args.check or args.fix or args.cleanup):
         parser.print_help()
+        return
+    
+    if args.cleanup:
+        if cleanup_gpio():
+            logger.info("GPIO cleanup successful")
+        else:
+            logger.error("GPIO cleanup failed")
         return
     
     if args.check:
@@ -117,7 +144,7 @@ def main():
     if args.fix:
         if fix_imports():
             logger.info("Successfully fixed imports!")
-            logger.info("Now run: python -m litclock --test")
+            logger.info("Now run: python -m litclock.cli --test")
         else:
             logger.error("Failed to fix imports. Check the logs for details.")
 
