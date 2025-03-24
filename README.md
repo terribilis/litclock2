@@ -33,19 +33,25 @@ A Raspberry Pi Zero 2 based clock that displays literary quotes matching the cur
 sudo apt update && sudo apt upgrade -y
 
 # Install required packages
-sudo apt install -y python3-pip python3-pil python3-flask wiringpi git
+sudo apt install -y python3-pip python3-venv python3-full python3-pil git
 
-# Install Python packages
-sudo pip3 install RPi.GPIO spidev pillow flask werkzeug
-```
-
-### 3. Download and Setup the Literary Clock
-
-```bash
 # Clone the repository
 git clone https://github.com/yourusername/litclock.git
 cd litclock
 
+# Create a virtual environment
+python3 -m venv venv
+
+# Activate the virtual environment
+source venv/bin/activate
+
+# Install the package in development mode
+pip install -e .
+```
+
+### 3. Setup Required Directories
+
+```bash
 # Create required directories
 mkdir -p images fonts data
 
@@ -61,13 +67,21 @@ wget -P fonts/ https://github.com/google/fonts/raw/main/apache/opensans/OpenSans
 # Copy service files to systemd
 sudo cp systemd/litclock.service /etc/systemd/system/
 sudo cp systemd/webinterface.service /etc/systemd/system/
+sudo cp systemd/litclock-all.service /etc/systemd/system/
 
 # Update file paths in service files if needed
 sudo nano /etc/systemd/system/litclock.service
 sudo nano /etc/systemd/system/webinterface.service
+sudo nano /etc/systemd/system/litclock-all.service
 
-# Enable and start services
+# Enable and start services (choose one)
 sudo systemctl daemon-reload
+
+# Option 1: Run both the clock and web interface together
+sudo systemctl enable litclock-all.service
+sudo systemctl start litclock-all.service
+
+# Option 2: Run the clock and web interface separately
 sudo systemctl enable litclock.service
 sudo systemctl enable webinterface.service
 sudo systemctl start litclock.service
@@ -79,14 +93,17 @@ sudo systemctl start webinterface.service
 If you prefer to run the clock manually rather than as a service:
 
 ```bash
+# Activate the virtual environment
+source venv/bin/activate
+
 # Run both the clock and web interface
-python3 run.py
+python -m litclock.cli
 
 # Run only the web interface
-python3 run.py --web-only
+python -m litclock.cli --web-only
 
 # Run only the clock
-python3 run.py --clock-only
+python -m litclock.cli --clock-only
 ```
 
 ## Web Interface
@@ -134,11 +151,43 @@ The `data/config.json` file contains the following settings:
 - `content_filter`: Content filter setting ("all", "sfw", or "nsfw")
 - `display_brightness`: Display brightness percentage (0-100)
 
+## Package Structure
+
+The project is organized as a Python package:
+
+```
+litclock/
+├── litclock/           # Main package
+│   ├── __init__.py
+│   ├── cli.py          # Command-line interface
+│   ├── clock.py        # Clock functionality
+│   ├── web.py          # Web interface
+│   ├── epd/            # E-paper display drivers
+│   │   ├── __init__.py
+│   │   ├── epdconfig.py
+│   │   └── epd13in3b.py
+│   ├── utils/          # Utility functions
+│   │   ├── __init__.py
+│   │   ├── csv_converter.py
+│   │   └── image_generator.py
+│   ├── templates/      # Flask templates
+│   └── static/         # Static files for web UI
+├── data/               # Data files
+│   ├── config.json
+│   ├── quotes.json
+│   └── litclock_annotated.csv
+├── fonts/              # Font files
+├── images/             # Generated images
+├── systemd/            # Systemd service files
+└── setup.py            # Package setup file
+```
+
 ## Troubleshooting
 
 - **Display Issues**: Check the connections between the Raspberry Pi and the e-paper display.
 - **Web Interface Not Loading**: Ensure the web interface service is running and check firewall settings.
-- **Quote Not Updating**: Check the log files for errors (`litclock.log` and `web_interface.log`).
+- **Quote Not Updating**: Check the log files for errors (`litclock_runner.log` and `web_interface.log`).
+- **Import Errors**: Make sure you're running from the virtual environment with all dependencies installed.
 
 ## License
 
@@ -148,4 +197,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - Based on Waveshare e-paper display driver
 - Inspired by the Literary Clock concept from the Instructables community
-- Quotes data adapted from various literary clock projects 
+- Quotes data adapted from various literary clock projects

@@ -1,17 +1,17 @@
 [Unit]
-Description=Literary Clock Web Interface
+Description=Literary Clock with Web Interface
 After=network.target
 
 [Service]
 Type=simple
 User=pi
 WorkingDirectory=/home/pi/litclock
-ExecStart=/home/pi/litclock/venv/bin/python -m litclock.cli --web-only
+ExecStart=/home/pi/litclock/venv/bin/python -m litclock.cli
 Restart=on-failure
 RestartSec=10
 StandardOutput=syslog
 StandardError=syslog
-SyslogIdentifier=litclock-web
+SyslogIdentifier=litclock-all
 
 [Install]
 WantedBy=multi-user.target 
