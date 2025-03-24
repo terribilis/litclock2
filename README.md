@@ -61,7 +61,21 @@ wget -P fonts/ https://github.com/google/fonts/raw/main/apache/opensans/OpenSans
 wget -P fonts/ https://github.com/google/fonts/raw/main/apache/opensans/OpenSans-Italic.ttf
 ```
 
-### 4. Install as a Service
+### 4. Test the E-Paper Display (Optional)
+
+You can test if your e-paper display is working correctly:
+
+```bash
+# Activate the virtual environment (if not already active)
+source venv/bin/activate
+
+# Run the display test
+python -m litclock.cli --test
+```
+
+This will display various patterns, text, and shapes on the e-paper display to verify everything is working correctly.
+
+### 5. Install as a Service
 
 ```bash
 # Copy service files to systemd
@@ -88,7 +102,7 @@ sudo systemctl start litclock.service
 sudo systemctl start webinterface.service
 ```
 
-### 5. Manually Running the Clock
+### 6. Manually Running the Clock
 
 If you prefer to run the clock manually rather than as a service:
 

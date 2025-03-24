@@ -25,4 +25,14 @@ python -m litclock --clock-only
 Run just the web interface:
 ```bash
 python -m litclock --web-only
+```
+
+Test the e-paper display:
+```bash
+python -m litclock --test
+```
+
+Additional options:
+```bash
+python -m litclock --help
 ``` 

@@ -6,6 +6,7 @@ This package contains the necessary drivers for the 13.3-inch e-paper HAT (B) di
 
 - `epd13in3b.py`: Driver for the 13.3-inch e-paper display with black and red colors
 - `epdconfig.py`: Configuration and GPIO setup for e-paper display
+- `test_display.py`: Test script to verify the e-paper display is working correctly
 
 ## Usage
 
@@ -24,6 +25,17 @@ epd.display(black_image, red_image)
 # Sleep the display when not in use
 epd.sleep()
 ```
+
+## Testing the Display
+
+You can test if your e-paper display is working correctly using the included test script:
+
+```bash
+# After installing the package (pip install -e .)
+python -m litclock.epd.test_display
+```
+
+This will run a comprehensive test displaying various patterns, text, and shapes on the e-paper display.
 
 ## Credits
 
