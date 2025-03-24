@@ -34,10 +34,18 @@ def start_web_server_thread(host='0.0.0.0', port=8080):
 
 def test_display():
     """Run a test on the e-paper display"""
-    from litclock.epd.test_display import test_display
+    # First ensure compatibility setup is done
+    try:
+        from litclock.epd.compatibility import ensure_compatibility
+        ensure_compatibility()
+    except Exception as e:
+        logger.warning(f"Compatibility setup failed: {e}, proceeding anyway")
+    
+    # Now run the actual test
+    from litclock.epd.test_display import test_display as run_test
     
     logger.info("Running e-paper display test...")
-    success = test_display()
+    success = run_test()
     if success:
         logger.info("Display test completed successfully")
     else:

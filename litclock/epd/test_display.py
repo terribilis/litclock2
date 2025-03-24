@@ -16,11 +16,35 @@ import traceback
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+# Import and run the compatibility module to ensure paths are set up
+try:
+    from litclock.epd.compatibility import ensure_compatibility
+    ensure_compatibility()
+except Exception as e:
+    logger.warning(f"Compatibility setup failed: {e}, will try direct import")
+
 def test_display():
     """Run a comprehensive test of the e-paper display"""
     try:
-        # Import the specific EPD module
-        from litclock.epd import epd13in3b
+        # Try to find the module in multiple ways - first use direct import like the working example
+        try:
+            # Add utils directory to path if not already there
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            utils_path = os.path.join(project_root, 'utils')
+            if utils_path not in sys.path:
+                sys.path.insert(0, utils_path)
+                
+            # Try to import like in the original working script
+            try:
+                import epd13in3b
+                logger.info("Imported epd13in3b directly")
+            except ImportError:
+                # Fall back to package import
+                from litclock.epd import epd13in3b
+                logger.info("Imported epd13in3b from package")
+        except ImportError as e:
+            logger.error(f"Failed to import epd13in3b: {e}")
+            return False
         
         logger.info("epd13in3b Demo")
         epd = epd13in3b.EPD()
@@ -51,15 +75,15 @@ def test_display():
             font18 = ImageFont.load_default()
             font35 = ImageFont.load_default()
         
-        # Drawing on the Horizontal image
-        logger.info("Drawing test patterns...")
+        # Drawing on the Horizontal image - following exact same pattern as working example
+        logger.info("Drawing on the Horizontal image...")
         HBlackimage = Image.new('1', (epd.width, epd.height), 255)  # 255: white, 0: black
         HRedimage = Image.new('1', (epd.width, epd.height), 255)    # 255: white, 0: red
         
         drawblack = ImageDraw.Draw(HBlackimage)
         drawred = ImageDraw.Draw(HRedimage)
         
-        # Draw some text and shapes - following the original test
+        # Draw exactly the same test pattern as the working example
         drawblack.text((10, 0), 'hello world', font=font24, fill=0)
         drawred.text((10, 20), '13.3inch e-Paper (B)', font=font24, fill=0)
         drawblack.text((150, 0), 'Waveshare Electronics', font=font24, fill=0)
@@ -72,15 +96,13 @@ def test_display():
         drawred.rectangle((80, 50, 130, 100), fill=0)
         drawblack.chord((200, 50, 250, 100), 0, 360, fill=0)
         
-        # Important: Use display_Base instead of display
+        # Use display_Base as the working example does
         logger.info("Displaying test pattern...")
         epd.display_Base(epd.getbuffer(HBlackimage), epd.getbuffer(HRedimage))
-        
-        # Wait for 2 seconds
         time.sleep(2)
         
-        # Partial update demo
-        logger.info("Demonstrating partial updates...")
+        # Partial update demo - exactly as in the working example
+        logger.info("Demonstrating partial updates (showing time)...")
         num = 0
         while True:
             drawblack.rectangle((0, 110, 120, 150), fill=255)
@@ -90,26 +112,30 @@ def test_display():
             if num == 10:
                 break
         
-        # Clear the display when done
-        logger.info("Clearing display...")
+        # Clean up exactly as in the working example 
+        logger.info("Clear...")
         epd.init()
         epd.Clear()
         
         # Put the display to sleep
-        logger.info("Putting display to sleep...")
+        logger.info("Goto Sleep...")
         epd.sleep()
         
         logger.info("Test completed successfully!")
         return True
         
     except KeyboardInterrupt:
-        logger.info("Test interrupted by user")
+        logger.info("ctrl + c:")
         try:
-            from litclock.epd import epd13in3b
-            epd13in3b.epdconfig.module_exit(cleanup=True)
+            # Use the same module exit as the original script
+            if 'epd13in3b' in locals():
+                epd13in3b.epdconfig.module_exit(cleanup=True)
+            else:
+                from litclock.epd import epd13in3b
+                epd13in3b.epdconfig.module_exit(cleanup=True)
         except:
-            pass
-        return False
+            logger.error("Failed to clean up")
+        exit()
         
     except Exception as e:
         logger.error(f"Error during test: {e}")
