@@ -23,6 +23,7 @@ ENV/
 # Generated files
 images/*.png
 images/*.jpg
+images/*.bmp
 *.log
 
 # Environment variables
