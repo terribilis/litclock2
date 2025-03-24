@@ -10,22 +10,22 @@ import time
 import logging
 import argparse
 from PIL import Image, ImageDraw, ImageFont
+import traceback
 
 # Set up logging
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 def test_display():
     """Run a comprehensive test of the e-paper display"""
     try:
-        # Import the EPD class from our package
-        from litclock.epd import EPD
+        # Import the specific EPD module
+        from litclock.epd import epd13in3b
         
-        logger.info("Initializing 13.3-inch e-Paper display")
-        epd = EPD()
+        logger.info("epd13in3b Demo")
+        epd = epd13in3b.EPD()
         
-        logger.info("Init and Clear")
+        logger.info("init and Clear")
         epd.init()
         epd.Clear()
         
@@ -53,57 +53,46 @@ def test_display():
         
         # Drawing on the Horizontal image
         logger.info("Drawing test patterns...")
-        black_image = Image.new('1', (epd.width, epd.height), 255)  # 255: white, 0: black
-        red_image = Image.new('1', (epd.width, epd.height), 255)    # 255: white, 0: red
+        HBlackimage = Image.new('1', (epd.width, epd.height), 255)  # 255: white, 0: black
+        HRedimage = Image.new('1', (epd.width, epd.height), 255)    # 255: white, 0: red
         
-        draw_black = ImageDraw.Draw(black_image)
-        draw_red = ImageDraw.Draw(red_image)
+        drawblack = ImageDraw.Draw(HBlackimage)
+        drawred = ImageDraw.Draw(HRedimage)
         
-        # Draw some text and shapes
-        draw_black.text((10, 10), 'Literary Clock Test', font=font35, fill=0)
-        draw_red.text((10, 60), '13.3-inch e-Paper (B)', font=font24, fill=0)
-        draw_black.text((10, 100), 'Current time: ' + time.strftime('%H:%M:%S'), font=font24, fill=0)
-        draw_black.text((10, 140), 'Date: ' + time.strftime('%Y-%m-%d'), font=font24, fill=0)
+        # Draw some text and shapes - following the original test
+        drawblack.text((10, 0), 'hello world', font=font24, fill=0)
+        drawred.text((10, 20), '13.3inch e-Paper (B)', font=font24, fill=0)
+        drawblack.text((150, 0), 'Waveshare Electronics', font=font24, fill=0)
+        drawred.line((20, 50, 70, 100), fill=0)
+        drawblack.line((70, 50, 20, 100), fill=0)
+        drawred.rectangle((20, 50, 70, 100), outline=0)
+        drawblack.line((165, 50, 165, 100), fill=0)
+        drawred.line((140, 75, 190, 75), fill=0)
+        drawblack.arc((140, 50, 190, 100), 0, 360, fill=0)
+        drawred.rectangle((80, 50, 130, 100), fill=0)
+        drawblack.chord((200, 50, 250, 100), 0, 360, fill=0)
         
-        # Draw a border around the display
-        draw_black.rectangle((5, 5, epd.width-5, epd.height-5), outline=0)
-        
-        # Draw some shapes
-        # Black shapes
-        draw_black.line((50, 200, 150, 300), fill=0, width=3)
-        draw_black.rectangle((200, 200, 300, 300), outline=0)
-        draw_black.ellipse((350, 200, 450, 300), outline=0)
-        
-        # Red shapes
-        draw_red.line((500, 200, 600, 300), fill=0, width=3)
-        draw_red.rectangle((650, 200, 750, 300), outline=0)
-        draw_red.ellipse((800, 200, 900, 300), outline=0)
-        
-        # Filled shapes
-        draw_black.rectangle((200, 350, 300, 450), fill=0)
-        draw_red.ellipse((350, 350, 450, 450), fill=0)
-        
-        # Display the images
+        # Important: Use display_Base instead of display
         logger.info("Displaying test pattern...")
-        epd.display(epd.getbuffer(black_image), epd.getbuffer(red_image))
+        epd.display_Base(epd.getbuffer(HBlackimage), epd.getbuffer(HRedimage))
         
-        # Wait for 5 seconds
-        logger.info("Test pattern will remain for 5 seconds...")
-        time.sleep(5)
+        # Wait for 2 seconds
+        time.sleep(2)
         
         # Partial update demo
         logger.info("Demonstrating partial updates...")
-        for i in range(5):
-            # Update a small area with the current time
-            draw_black.rectangle((10, 100, 400, 124), fill=255)  # Clear the time area
-            draw_black.text((10, 100), 'Current time: ' + time.strftime('%H:%M:%S'), font=font24, fill=0)
-            
-            # Perform partial update
-            epd.display_Partial(epd.getbuffer(black_image), 10, 100, 400, 124)
-            time.sleep(1)
+        num = 0
+        while True:
+            drawblack.rectangle((0, 110, 120, 150), fill=255)
+            drawblack.text((10, 120), time.strftime('%H:%M:%S'), font=font24, fill=0)
+            epd.display_Partial(epd.getbuffer(HBlackimage), 0, 110, 120, 160)
+            num = num + 1
+            if num == 10:
+                break
         
         # Clear the display when done
         logger.info("Clearing display...")
+        epd.init()
         epd.Clear()
         
         # Put the display to sleep
@@ -116,16 +105,14 @@ def test_display():
     except KeyboardInterrupt:
         logger.info("Test interrupted by user")
         try:
-            from litclock.epd import EPD
-            epd = EPD()
-            epd.sleep()
+            from litclock.epd import epd13in3b
+            epd13in3b.epdconfig.module_exit(cleanup=True)
         except:
             pass
         return False
         
     except Exception as e:
         logger.error(f"Error during test: {e}")
-        import traceback
         traceback.print_exc()
         return False
 
